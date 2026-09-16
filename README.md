@@ -86,7 +86,8 @@ project1_readmission/
 # Setup with virtual environment
 python -m venv .venv
 source .venv/bin/activate
-pip install -r requirements.txt
+pip install -r requirements.txt              # serving deps (also what Docker installs)
+pip install -r requirements-train.txt        # + training deps (xgboost, mlflow) for retraining
 
 # Train models (logs to MLflow)
 cd src
