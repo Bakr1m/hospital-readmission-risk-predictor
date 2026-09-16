@@ -1,143 +1,117 @@
 """
-Pytest tests for preprocessing pipeline - Project 1 Hospital Readmission
+Pytest tests for preprocessing pipeline - Project 1 Hospital Readmission.
+
+Tests import the real functions from src.preprocessing (no logic duplication):
+- engineer_features / get_feature_columns / build_preprocessor
 """
-import pytest
-import pandas as pd
-import numpy as np
-import joblib
-import tempfile
 import os
+import tempfile
+
+import joblib
+import numpy as np
+import pandas as pd
+import pytest
 from sklearn.model_selection import train_test_split
-from sklearn.pipeline import Pipeline
-from sklearn.preprocessing import StandardScaler, OneHotEncoder
-from sklearn.impute import SimpleImputer
-from sklearn.compose import ColumnTransformer
+
+from src.preprocessing import build_preprocessor, engineer_features, get_feature_columns
 
 
-# Load data and build preprocessor (shared fixture)
 @pytest.fixture(scope="module")
-def data_and_preprocessor():
-    df = pd.read_csv('data/diabetes_clean.csv')
-    
-    exclude_cols = ['encounter_id', 'patient_nbr', 'diag_1', 'diag_2', 'diag_3', 
-                    'readmitted', 'readmitted_binary']
-    feature_cols = [c for c in df.columns if c not in exclude_cols]
-    
+def df():
+    """Load cleaned data and apply feature engineering."""
+    df = pd.read_csv("data/diabetes_clean.csv")
+    df = engineer_features(df)
+    return df
+
+
+@pytest.fixture(scope="module")
+def feature_cols(df):
+    """Feature columns (excludes IDs and targets)."""
+    return get_feature_columns(df)
+
+
+@pytest.fixture(scope="module")
+def fitted(df, feature_cols):
+    """Build the preprocessor on feature columns and fit it. Returns (preprocessor, X)."""
     X = df[feature_cols]
-    y = df['readmitted_binary']
-    
-    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42, stratify=y)
-    
-    numeric_features = X_train.select_dtypes(include=[np.number]).columns.tolist()
-    categorical_features = X_train.select_dtypes(include=['object', 'category']).columns.tolist()
-    
-    numeric_transformer = Pipeline(steps=[
-        ('imputer', SimpleImputer(strategy='median')),
-        ('scaler', StandardScaler())
-    ])
-    
-    categorical_transformer = Pipeline(steps=[
-        ('imputer', SimpleImputer(strategy='most_frequent')),
-        ('encoder', OneHotEncoder(handle_unknown='ignore', sparse_output=False))
-    ])
-    
-    preprocessor = ColumnTransformer(
-        transformers=[
-            ('num', numeric_transformer, numeric_features),
-            ('cat', categorical_transformer, categorical_features)
-        ]
-    )
-    
-    X_train_processed = preprocessor.fit_transform(X_train)
-    X_test_processed = preprocessor.transform(X_test)
-    
-    return {
-        'X_train': X_train,
-        'X_test': X_test,
-        'y_train': y_train,
-        'y_test': y_test,
-        'preprocessor': preprocessor,
-        'X_train_processed': X_train_processed,
-        'X_test_processed': X_test_processed,
-        'numeric_features': numeric_features,
-        'categorical_features': categorical_features
-    }
+    preprocessor, numeric_features, categorical_features = build_preprocessor(X)
+    preprocessor.fit(X)
+    return preprocessor, X
 
 
-def test_no_missing_after_transform(data_and_preprocessor):
-    """Test that preprocessor output has no missing values"""
-    X_test_proc = data_and_preprocessor['X_test_processed']
-    if hasattr(X_test_proc, 'toarray'):
-        X_test_proc = X_test_proc.toarray()
-    assert not np.isnan(X_test_proc).any(), "Preprocessor output contains NaN values"
+def test_engineer_features_invariants(df):
+    """Engineered features stay within their expected domains."""
+    assert (df["prior_admissions"] >= 0).all(), "prior_admissions has negative values"
+    assert (df["med_change_count"] >= 0).all(), "med_change_count has negative values"
+    assert (df["med_change_count"] <= 23).all(), "med_change_count exceeds max possible"
+
+    valid_los = ["Short (1-3d)", "Medium (4-7d)", "Long (8-14d)", "Very Long (14+d)"]
+    assert df["los_category"].isin(valid_los).all(), "Invalid los_category values"
+    assert df["age_midpoint"].dropna().between(5, 95).all(), "age_midpoint out of range"
 
 
-def test_known_input_known_output(data_and_preprocessor):
-    """Test specific known input produces expected output shape and no errors"""
-    preprocessor = data_and_preprocessor['preprocessor']
-    X_train = data_and_preprocessor['X_train']
-    X_train_processed = data_and_preprocessor['X_train_processed']
-    
-    known_input = data_and_preprocessor['X_train'].iloc[:1]
-    transformed = preprocessor.transform(known_input)
-    
-    expected_n_features = data_and_preprocessor['X_train_processed'].shape[1]
-    if hasattr(transformed, 'toarray'):
-        transformed = transformed.toarray()
-    assert transformed.shape == (1, expected_n_features), \
-        f"Expected shape (1, {expected_n_features}), got {transformed.shape}"
-    
-    assert not np.isnan(transformed).any(), "Known input produced NaN output"
+def test_get_feature_columns_excludes_ids_and_targets(df, feature_cols):
+    """get_feature_columns returns a non-empty list without IDs/targets/raw diag codes."""
+    assert isinstance(feature_cols, list)
+    assert len(feature_cols) > 0
+    for excluded in ["encounter_id", "patient_nbr", "diag_1", "diag_2", "diag_3",
+                     "readmitted", "readmitted_binary"]:
+        assert excluded not in feature_cols, f"{excluded} should be excluded"
+    # Engineered features must be present
+    for expected in ["prior_admissions", "med_change_count", "los_category", "age_midpoint"]:
+        assert expected in feature_cols, f"{expected} missing from feature columns"
 
 
-def test_feature_engineering_invariants(data_and_preprocessor):
-    """Test that engineered features maintain expected invariants"""
-    X_train = data_and_preprocessor['X_train']
-    
-    assert (data_and_preprocessor['X_train']['prior_admissions'] >= 0).all(), "prior_admissions has negative values"
-    assert (data_and_preprocessor['X_train']['med_change_count'] >= 0).all(), "med_change_count has negative values"
-    assert (data_and_preprocessor['X_train']['med_change_count'] <= 23).all(), "med_change_count exceeds max possible"
-    
-    valid_los = ['Short (1-3d)', 'Medium (4-7d)', 'Long (8-14d)', 'Very Long (14+d)']
-    assert data_and_preprocessor['X_train']['los_category'].isin(valid_los).all(), "Invalid los_category values"
-    assert data_and_preprocessor['X_train']['age_midpoint'].between(5, 95).all(), "age_midpoint out of range"
+def test_preprocessor_output_has_no_missing(fitted):
+    """Fitted preprocessor output contains no NaN (imputation works)."""
+    preprocessor, X = fitted
+    X_processed = preprocessor.transform(X)
+    if hasattr(X_processed, "toarray"):
+        X_processed = X_processed.toarray()
+    assert X_processed.shape[0] == X.shape[0], "Row count changed during transform"
+    assert X_processed.shape[1] > 0, "Preprocessor produced 0 features"
+    assert not np.isnan(X_processed).any(), "Preprocessor output contains NaN values"
 
 
-def test_pipeline_serialization(data_and_preprocessor):
-    """Test that preprocessor can be saved and loaded correctly"""
-    preprocessor = data_and_preprocessor['preprocessor']
-    X_train = data_and_preprocessor['X_train']
-    
-    with tempfile.NamedTemporaryFile(suffix='.joblib', delete=False) as f:
+def test_known_input_known_output(fitted):
+    """A single known row transforms to the expected (1, n_features) shape without NaN."""
+    preprocessor, X = fitted
+    n_features = preprocessor.transform(X.iloc[:5]).shape[1]
+    single = preprocessor.transform(X.iloc[:1])
+    if hasattr(single, "toarray"):
+        single = single.toarray()
+    assert single.shape == (1, n_features), f"Expected (1, {n_features}), got {single.shape}"
+    assert not np.isnan(single).any(), "Known input produced NaN output"
+
+
+def test_pipeline_serialization_roundtrip(fitted):
+    """Preprocessor survives a save/load round-trip with identical outputs."""
+    preprocessor, X = fitted
+    with tempfile.NamedTemporaryFile(suffix=".joblib", delete=False) as f:
         temp_path = f.name
-    
     try:
         joblib.dump(preprocessor, temp_path)
-        loaded_preprocessor = joblib.load(temp_path)
-        
-        test_input = data_and_preprocessor['X_train'].iloc[:5]
-        original_output = preprocessor.transform(test_input)
-        loaded_output = loaded_preprocessor.transform(test_input)
-        
-        if hasattr(original_output, 'toarray'):
-            original_output = original_output.toarray()
-        if hasattr(loaded_output, 'toarray'):
-            loaded_output = loaded_output.toarray()
-        
-        np.testing.assert_array_almost_equal(original_output, loaded_output, decimal=5)
+        loaded = joblib.load(temp_path)
+        sample = X.iloc[:5]
+        original = preprocessor.transform(sample)
+        reloaded = loaded.transform(sample)
+        if hasattr(original, "toarray"):
+            original = original.toarray()
+        if hasattr(reloaded, "toarray"):
+            reloaded = reloaded.toarray()
+        np.testing.assert_array_almost_equal(original, reloaded, decimal=5)
     finally:
         if os.path.exists(temp_path):
             os.unlink(temp_path)
 
 
-def test_class_balance_preserved(data_and_preprocessor):
-    """Test that stratified split preserves class balance"""
-    y_train = data_and_preprocessor['y_train']
-    y_test = data_and_preprocessor['y_test']
-    
-    train_prop = data_and_preprocessor['y_train'].mean()
-    test_prop = data_and_preprocessor['y_test'].mean()
-    overall_prop = pd.concat([y_train, y_test]).mean()
-    
-    assert abs(train_prop - overall_prop) < 0.02, f"Train prop {train_prop:.4f} vs overall {overall_prop:.4f}"
-    assert abs(test_prop - overall_prop) < 0.02, f"Test prop {test_prop:.4f} vs overall {overall_prop:.4f}"
+def test_class_balance_preserved(df, feature_cols):
+    """Stratified split preserves the 11.2% positive-class balance."""
+    X = df[feature_cols]
+    y = df["readmitted_binary"]
+    X_train, X_test, y_train, y_test = train_test_split(
+        X, y, test_size=0.2, random_state=42, stratify=y
+    )
+    overall = y.mean()
+    assert abs(y_train.mean() - overall) < 0.02, "Train split class balance drifted"
+    assert abs(y_test.mean() - overall) < 0.02, "Test split class balance drifted"

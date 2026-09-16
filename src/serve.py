@@ -1,6 +1,9 @@
 """
 FastAPI serving script for Hospital Readmission model
 """
+import sys
+from pathlib import Path
+
 import joblib
 import pandas as pd
 import numpy as np
@@ -9,10 +12,14 @@ from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel, Field
 from typing import List, Dict, Any
 
+PROJECT_ROOT = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(PROJECT_ROOT / "src"))
+
 app = FastAPI(title="Hospital Readmission Risk API")
 
-# Load pipeline at startup
-pipeline = joblib.load("models/readmission_best.joblib")
+# Load pipeline at startup (path resolves regardless of working directory)
+MODEL_PATH = PROJECT_ROOT / "models" / "readmission_best.joblib"
+pipeline = joblib.load(MODEL_PATH)
 preprocessor = pipeline.named_steps['preprocessor']
 model = pipeline.named_steps['classifier']
 
@@ -98,10 +105,15 @@ class PatientInput(BaseModel):
     age_midpoint: float
 
 
+class ShapFeature(BaseModel):
+    feature: str
+    shap_value: float
+
+
 class PredictionResponse(BaseModel):
     readmission_risk: float
     risk_category: str
-    top_shap_features: List[Dict[str, float]]
+    top_shap_features: List[ShapFeature]
 
 
 def get_risk_category(probability: float) -> str:
@@ -152,31 +164,17 @@ def predict(patient: PatientInput):
         proba = pipeline.predict_proba(input_df)[0, 1]
         risk_cat = get_risk_category(proba)
         
-        # SHAP explanation
-        input_processed = pipeline.named_steps['preprocessor'].transform(input_df)
+        # SHAP explanation (feature names come from the fitted preprocessor,
+        # so they always match the one-hot expanded model input width)
+        preprocessor_step = pipeline.named_steps['preprocessor']
+        input_processed = preprocessor_step.transform(input_df)
         shap_values = explainer.shap_values(input_processed)
-        
+
         if isinstance(shap_values, list):
             shap_values = shap_values[1]
-        
-        # Get feature names from preprocessor
-        cat_features = ['race', 'gender', 'age', 'weight', 'payer_code', 'medical_specialty',
-                        'metformin', 'repaglinide', 'nateglinide', 'chlorpropamide', 'glimepiride',
-                        'acetohexamide', 'glipizide', 'glyburide', 'tolbutamide', 'pioglitazone',
-                        'rosiglitazone', 'acarbose', 'miglitol', 'troglitazone', 'tolazamide',
-                        'examide', 'citoglipton', 'insulin', 'glyburide-metformin',
-                        'glipizide-metformin', 'glimepiride-pioglitazone',
-                        'metformin-rosiglitazone', 'metformin-pioglitazone',
-                        'change', 'diabetesMed', 'diag_1_cat', 'diag_2_cat', 'diag_3_cat',
-                        'los_category', 'num_diagnoses_cat']
-        numeric_features = ['admission_type_id', 'discharge_disposition_id', 'admission_source_id',
-                           'time_in_hospital', 'num_lab_procedures', 'num_procedures',
-                           'num_medications', 'number_outpatient', 'number_emergency',
-                           'number_inpatient', 'number_diagnoses', 'prior_admissions',
-                           'med_change_count', 'age_midpoint']
-        
-        feature_names = numeric_features + cat_features
-        
+
+        feature_names = list(preprocessor_step.get_feature_names_out())
+
         top_features = get_top_shap_features(shap_values, feature_names)
         
         return PredictionResponse(

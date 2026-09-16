@@ -12,7 +12,9 @@ from sklearn.compose import ColumnTransformer
 def build_preprocessor(X_train):
     """Build and return fitted ColumnTransformer"""
     numeric_features = X_train.select_dtypes(include=[np.number]).columns.tolist()
-    categorical_features = X_train.select_dtypes(include=['object', 'category']).columns.tolist()
+    # Everything non-numeric is treated as categorical (version-proof across
+    # pandas 2.x object-dtype and pandas 3.x str-dtype strings).
+    categorical_features = [c for c in X_train.columns if c not in numeric_features]
     
     numeric_transformer = Pipeline(steps=[
         ('imputer', SimpleImputer(strategy='median')),
@@ -65,8 +67,8 @@ def engineer_features(df):
                '[80-90)': 85, '[90-100)': 95}
     df['age_midpoint'] = df['age'].map(age_map)
     
-    # Clean '?' values
-    for col in df.select_dtypes(include='object').columns:
+    # Clean '?' values (non-numeric columns only; works on pandas 2.x and 3.x)
+    for col in df.select_dtypes(exclude=[np.number]).columns:
         if '?' in df[col].values:
             df[col] = df[col].replace('?', 'Unknown')
     df['gender'] = df['gender'].replace('Unknown/Invalid', 'Unknown')

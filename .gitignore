@@ -1,0 +1,35 @@
+# Project environments
+.venv/
+venv/
+
+# Python cache
+__pycache__/
+*.pyc
+.pytest_cache/
+
+# MLflow & models
+mlruns/
+mlruns_backup*/
+models/*.joblib
+models/*.pkl
+
+# Data (raw CSVs should not be tracked; cleaned data may be large)
+data/*.csv
+data/*.pkl
+
+# IDE/OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+
+# Distribution
+dist/
+build/
+*.egg-info/
+
+# Docker
+.docker/
