@@ -64,19 +64,22 @@ US hospitals face financial penalties under the Hospital Readmissions Reduction 
 
 ```
 project1_readmission/
-├ data/              # diabetes_raw.csv, diabetes_clean.csv
-├ notebooks/         # 01_eda ... 10_mock_interview
+├ data/              # diabetes_raw.csv, diabetes_clean.csv (gitignored — download from UCI, see Dataset)
+├ notebooks/         # 01_eda ... 07_api_docker
 ├ src/
 │   ├── preprocessing.py      # Feature engineering + ColumnTransformer
 │   ├── train.py              # Training orchestration + MLflow tracking
-│   └── serve.py              # FastAPI /predict endpoint + SHAP
+│   └── serve.py              # FastAPI app: /predict endpoint + SHAP
 ├ models/              # readmission_best.joblib (LightGBM pipeline)
-├ api/                 # FastAPI /predict endpoint
+├ api/
+│   └── main.py               # Thin entrypoint (imports app from src.serve)
 ├ tests/               # pytest tests
-├ mlruns/              # MLflow tracking
+├ mlruns/              # MLflow tracking (gitignored)
 ├ Dockerfile
-├ requirements.txt
+├ requirements.txt         # serving deps (also what Docker installs)
+├ requirements-train.txt   # + training deps (xgboost, mlflow, local retraining only)
 ├ .gitignore
+├ .dockerignore
 └ README.md
 ```
 
@@ -89,17 +92,23 @@ source .venv/bin/activate
 pip install -r requirements.txt              # serving deps (also what Docker installs)
 pip install -r requirements-train.txt        # + training deps (xgboost, mlflow) for retraining
 
-# Train models (logs to MLflow)
-cd src
-python train.py
+# Train models (logs to MLflow; runs from the project root)
+python src/train.py
 
 # Run API locally
-cd ..
 python api/main.py
 # Test: curl -X POST http://localhost:8000/predict -H "Content-Type: application/json" -d '{"race": "Caucasian", "gender": "Female", "age": "[70-80)", ...}'
 
 # MLflow UI
-mlflow ui --backend-store-uri file:mlruns
+mlflow ui --backend-store-uri ./mlruns
+```
+
+## Run with Docker (no local setup needed)
+
+```bash
+docker pull bakr1m/readmission-api:v1
+docker run -p 8000:8000 bakr1m/readmission-api:v1
+# Test: curl -X POST http://localhost:8000/predict -H "Content-Type: application/json" -d @sample_patient.json
 ```
 
 ## API Response Format
@@ -142,12 +151,3 @@ Top features driving readmission risk:
 - Implement drift monitoring on deployed predictions
 - Conduct prospective validation study with clinical stakeholders
 - Explore cost-sensitive learning during training (not just post-hoc thresholding)
-```
-
----
-
-Now let me rewrite the test_preprocessing.py to import from src:
-<tool_call>
-<function=todowrite>
-<parameter=todos>
-[{"priority": "high", "content": "Analyze project structure and identify all gaps", "status": "completed"}, {"priority": "high", "content": "Rewrite README.md with polished version including all sections", "status": "completed"}, {"priority": "high", "content": "Rewrite test_preprocessing.py to import from src.preprocessing", "status": "in_progress"}, {"priority": "high", "content": "Fix src/train.py bug (Pipeline import, redundant CSV reads)", "status": "pending"}, {"priority": "high", "content": "Rename venv/ to .venv/ and verify it works", "status": "pending"}, {"priority": "high", "content": "Create project-level .gitignore", "status": "pending"}, {"priority": "high", "content": "Test training pipeline (train.py) end-to-end", "status": "pending"}, {"priority": "high", "content": "Test API locally (curl /predict)", "status": "pending"}, {"priority": "high", "content": "Build Docker image and push to DockerHub bakr1m", "status": "pending"}, {"priority": "high", "content": "Git commit with descriptive message", "status": "pending"}]
