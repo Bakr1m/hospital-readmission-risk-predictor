@@ -6,14 +6,22 @@ venv/
 __pycache__/
 *.pyc
 .pytest_cache/
+.coverage
+htmlcov/
 
-# MLflow & models
+# Jupyter checkpoints
+.ipynb_checkpoints/
+
+# MLflow tracking (regenerable via `python src/train.py`)
 mlruns/
 mlruns_backup*/
-models/*.joblib
-models/*.pkl
 
-# Data (raw CSVs should not be tracked; cleaned data may be large)
+# Model artifacts: regenerable via `make train`.
+# Exception: the production artifact served by Docker is versioned intentionally.
+models/*
+!models/readmission_best.joblib
+
+# Data (large CSVs live outside git; see scripts/download_data.sh)
 data/*.csv
 data/*.pkl
 
@@ -26,10 +34,7 @@ Thumbs.db
 # Logs
 *.log
 
-# Distribution
+# Distribution / packaging
 dist/
 build/
 *.egg-info/
-
-# Docker
-.docker/

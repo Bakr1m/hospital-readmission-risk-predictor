@@ -1,0 +1,4 @@
+# Dev-only tools (linting, testing). Runtime deps live in requirements.txt.
+-r requirements.txt
+pytest
+ruff

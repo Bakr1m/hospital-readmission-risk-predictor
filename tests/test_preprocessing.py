@@ -4,6 +4,7 @@ Pytest tests for preprocessing pipeline - Project 1 Hospital Readmission.
 Tests import the real functions from src.preprocessing (no logic duplication):
 - engineer_features / get_feature_columns / build_preprocessor
 """
+
 import os
 import tempfile
 
@@ -54,8 +55,15 @@ def test_get_feature_columns_excludes_ids_and_targets(df, feature_cols):
     """get_feature_columns returns a non-empty list without IDs/targets/raw diag codes."""
     assert isinstance(feature_cols, list)
     assert len(feature_cols) > 0
-    for excluded in ["encounter_id", "patient_nbr", "diag_1", "diag_2", "diag_3",
-                     "readmitted", "readmitted_binary"]:
+    for excluded in [
+        "encounter_id",
+        "patient_nbr",
+        "diag_1",
+        "diag_2",
+        "diag_3",
+        "readmitted",
+        "readmitted_binary",
+    ]:
         assert excluded not in feature_cols, f"{excluded} should be excluded"
     # Engineered features must be present
     for expected in ["prior_admissions", "med_change_count", "los_category", "age_midpoint"]:
