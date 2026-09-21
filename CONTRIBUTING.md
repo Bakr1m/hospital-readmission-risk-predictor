@@ -21,6 +21,8 @@ make test           # run the test suite
    Pin any new dependency in `requirements*.txt`.
 3. **Tests before push.** `make test` must pass. New preprocessing logic needs
    a test in `tests/` that imports the real function (no logic duplication).
+   The suite must also pass **without** `data/` present (synthetic fallback),
+   because CI checks out the repo with data gitignored.
 4. **Lint.** `make lint` (ruff) must be clean.
 5. **Small, described commits.** One logical change per commit, imperative
    message (`"Fix ..."`, `"Add ..."`).
