@@ -78,8 +78,15 @@ project1_readmission/
 ├ Dockerfile
 ├ requirements.txt         # serving deps (also what Docker installs)
 ├ requirements-train.txt   # + training deps (xgboost, mlflow, local retraining only)
+├ requirements-dev.txt     # + dev tools (pytest, ruff)
+├ Makefile                 # shortcuts: install / test / lint / train / serve / docker-*
+├ pyproject.toml           # package metadata, pytest + ruff config
+├ example_request.json     # tested /predict payload
+├ docs/model_card.md       # intended use, metrics, limits, ethics
+├ .github/workflows/ci.yml # lint + tests on push/PR
 ├ .gitignore
 ├ .dockerignore
+├ LICENSE / CHANGELOG.md / CONTRIBUTING.md
 └ README.md
 ```
 
