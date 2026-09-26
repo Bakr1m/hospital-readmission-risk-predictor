@@ -16,10 +16,9 @@ htmlcov/
 mlruns/
 mlruns_backup*/
 
-# Model artifacts: regenerable via `make train`.
-# Exception: the production artifact served by Docker is versioned intentionally.
+# Model artifacts live in GitHub Releases (pinned by tag + SHA256),
+# fetched by the Dockerfile at build time — never in git.
 models/*
-!models/readmission_best.joblib
 
 # Data (large CSVs live outside git; see scripts/download_data.sh)
 data/*.csv
