@@ -15,7 +15,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - pytest suite for the preprocessing pipeline (6 tests).
 - Dockerized serving image (`bakr1m/readmission-api:v1`, ~1.23 GB), verified to
   return bit-identical predictions to local serving.
-- Professional repo hygiene: CONTRIBUTING, CHANGELOG, CI workflow,
+- Professional repo hygiene: LICENSE, CONTRIBUTING, CHANGELOG, CI workflow,
   Makefile, model card, example request payload.
 
 ### Fixed

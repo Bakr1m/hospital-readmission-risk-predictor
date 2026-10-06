@@ -86,7 +86,7 @@ project1_readmission/
 ├ .github/workflows/ci.yml # lint + tests on push/PR
 ├ .gitignore
 ├ .dockerignore
-├ CHANGELOG.md / CONTRIBUTING.md
+├ LICENSE / CHANGELOG.md / CONTRIBUTING.md
 └ README.md
 ```
 
