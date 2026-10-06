@@ -113,8 +113,8 @@ mlflow ui --backend-store-uri ./mlruns
 ## Run with Docker (no local setup needed)
 
 ```bash
-docker pull bakr1m/readmission-api:v1
-docker run -p 8000:8000 bakr1m/readmission-api:v1
+docker pull bakr1m/readmission-api:latest
+docker run -p 8000:8000 bakr1m/readmission-api:latest
 # Test: curl -X POST http://localhost:8000/predict -H "Content-Type: application/json" -d @sample_patient.json
 ```
 
