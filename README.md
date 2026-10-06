@@ -1,6 +1,4 @@
-# Project 1: Hospital Readmission Risk Predictor
-
-**Days 11–20 | Healthcare ML Portfolio**
+# Hospital Readmission Risk Predictor
 
 ## Business Context
 
