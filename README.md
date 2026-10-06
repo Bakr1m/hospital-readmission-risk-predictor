@@ -110,6 +110,24 @@ python api/main.py
 mlflow ui --backend-store-uri ./mlruns
 ```
 
+## Try It in 60 Seconds (no local setup needed)
+
+```bash
+docker pull bakr1m/readmission-api:latest
+docker run -d --name readmission -p 8001:8000 bakr1m/readmission-api:latest
+curl http://localhost:8001/health
+# {"status":"healthy"}
+curl -X POST http://localhost:8001/predict \
+  -H "Content-Type: application/json" \
+  -d @sample_patient.json
+# {"readmission_risk":0.1364,"risk_category":"low","top_shap_features":[...]}
+docker stop readmission && docker rm readmission
+```
+
+(`sample_patient.json` is in this repo — the exact payload CI smoke-tests
+the shipped image with. Port 8001 keeps this container clear of the other
+portfolio APIs if you run several at once.)
+
 ## Run with Docker (no local setup needed)
 
 ```bash
@@ -117,6 +135,29 @@ docker pull bakr1m/readmission-api:latest
 docker run -p 8000:8000 bakr1m/readmission-api:latest
 # Test: curl -X POST http://localhost:8000/predict -H "Content-Type: application/json" -d @sample_patient.json
 ```
+
+## Problems Encountered (Build & Deploy)
+
+1. **Tests assumed the dataset exists.** The first CI run failed: tests read
+   the CSV with a relative path, but `data/` is gitignored and absent on a
+   clean checkout. Fixed with a synthetic same-schema fallback — tests pass
+   with real data locally *and* with fake rows in CI (the hermetic rule now
+   enforced on every repo).
+2. **Model loaded at import time.** `joblib.load` at module scope turned a
+   missing artifact into a collection-time crash. Moved behind lazy
+   `get_pipeline()` on first request; a missing model is now a request-time
+   503, never an import crash.
+3. **2.51 GB Docker image.** Train-only deps (xgboost, mlflow, SHAP
+   training bits) were shipping to production. Splitting
+   `requirements.txt` (serve) / `-train` / `-dev` halved the image to
+   ~1.23 GB — the split every later repo inherited.
+4. **SHAP names vs pipeline columns.** Explanations initially used hardcoded
+   feature names that drifted from the fitted preprocessor. Now derived via
+   `get_feature_names_out()`, so explanations always match model inputs.
+5. **CD secret hygiene (fleet-wide).** A token value was once pasted as a
+   secret *name*, and `echo` added a trailing newline to another — both
+   broke DockerHub login in CI. Secrets are now set with `printf '%s'` and
+   verified with `secret list` before any pipeline runs.
 
 ## API Response Format
 
